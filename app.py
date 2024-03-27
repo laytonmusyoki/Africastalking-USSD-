@@ -1,16 +1,21 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template,session
+import pymysql
 
 
 
 
 app = Flask(__name__)
 
+app.secret_key = 'mawazo'
 
 
+connection=pymysql.connect(host='localhost',
+                            user='root',
+                            password='',
+                            db='ussd',
+                            )
 
-@app.route('/')
-def initialize():
-    pass
+
 
 
 @app.route('/callback', methods=['POST'])
@@ -26,20 +31,30 @@ def callback():
             res +="2. Register"
             return res
         elif text =="1":
-            res="CON Enter your phone number"
+            res="CON Enter your password"
             return res
         elif text =="2":
-            res="CON Enter your name"
+            res="CON Enter your password"
             return res
-        elif text =="1*1":
-            res="CON Options available\n"
-            res +="1. View products\n"
-            res +="2. View orders\n"
-            res +="3. Check balance \n"
-            res +="4. Withdraw funds\n"
-            res +="5. Logout"
-            return res
-        elif text =="1*1*1":
+        elif text.__contains__("1*"):
+            password = text.split("*")[1]
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM users WHERE password=%s", (password,))
+            user = cursor.fetchone()
+            cursor.close()
+            if user:
+                session['user_id']=user[0]
+                res="CON Options available\n"
+                res +="1. View products\n"
+                res +="2. View orders\n"
+                res +="3. Check balance \n"
+                res +="4. Withdraw funds\n"
+                res +="5. Logout"
+                return res
+            else:
+                res="END invalid password\n"
+                return res
+        elif text.__contains__("1*1"):
             res="END Products available\n"
             res +="1. Maize\n"
             res +="2. Beans\n"
@@ -61,11 +76,24 @@ def callback():
             res="CON Enter amount to withdraw"
             return res
         elif text=="1*1*5":
+            session.pop('user_id', None)
             res="END You have been logged out"
             return res
         elif text.__contains__("2*"):
-            res="END You are registered"
-            return res
+            password = text.split("*")[1]
+            cursor = connection.cursor()
+            cursor.execute("SELECT * FROM users WHERE password=%s", (password,))
+            user = cursor.fetchone()
+            if user:
+                res="END You are already registered"
+                return res
+            else:
+                cursor.execute("INSERT INTO users (password) VALUES (%s)", (password,))
+                connection.commit()
+                cursor.close()
+                res="END You have been registered"
+                return res
+
         return "END hello flask"
 
 
